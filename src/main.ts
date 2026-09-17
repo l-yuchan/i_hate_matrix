@@ -2,7 +2,7 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+
 
 const icon = (name: 'move' | 'rotate' | 'scale' | 'reset' | 'copy') => {
   const paths = {
@@ -18,69 +18,43 @@ const icon = (name: 'move' | 'rotate' | 'scale' | 'reset' | 'copy') => {
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <main class="editor-shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark"><i></i><i></i><i></i></span>
-        <span>Matrix Studio</span>
-        <span class="file-pill">Untitled transform</span>
-      </div>
-      <div class="top-actions">
-        <span class="saved"><span></span> Live</span>
-        <button class="icon-button" id="reset-button" title="Reset transform">${icon('reset')}</button>
-      </div>
-    </header>
-
     <section class="workspace">
       <div class="viewport" id="viewport">
         <div class="toolbar" role="toolbar" aria-label="Transform tools">
-          <button class="tool active" data-mode="translate" title="Move (G)">${icon('move')}<span>Move</span><kbd>G</kbd></button>
-          <button class="tool" data-mode="rotate" title="Rotate (R)">${icon('rotate')}<span>Rotate</span><kbd>R</kbd></button>
-          <button class="tool" data-mode="scale" title="Scale (S)">${icon('scale')}<span>Scale</span><kbd>S</kbd></button>
-          <span class="toolbar-divider"></span>
-          <button class="space-toggle" id="space-toggle" title="Toggle transform orientation"><span class="space-dot"></span><span id="space-label">World</span><svg viewBox="0 0 12 12"><path d="m3 4 3 3 3-3"/></svg></button>
+          <button class="tool active" data-mode="translate" title="Move (G)">${icon('move')}<span>Move</span></button>
+          <button class="tool" data-mode="rotate" title="Rotate (R)">${icon('rotate')}<span>Rotate</span></button>
+          <button class="tool" data-mode="scale" title="Scale (S)">${icon('scale')}<span>Scale</span></button>
+          <button class="space-toggle" id="space-toggle" title="Toggle transform orientation"><span id="space-label">World</span></button>
         </div>
 
-        <div class="scene-label">
-          <span class="object-icon"></span>
-          <div><strong>Transform Object</strong><small>Mesh · Selected</small></div>
-        </div>
-
-        <div class="view-cube" aria-label="Camera views">
-          <button class="cube-face top" data-view="top">TOP</button>
-          <button class="cube-face front" data-view="front">FRONT</button>
-          <button class="cube-face side" data-view="right">RIGHT</button>
-          <button class="home-view" data-view="iso" title="Perspective view">⌂</button>
-        </div>
-
-        <div class="axis-legend" aria-hidden="true">
-          <span class="axis-line axis-y">Y</span><span class="axis-line axis-x">X</span><span class="axis-z">Z</span>
-        </div>
+        <nav class="view-controls" aria-label="Camera views">
+          <button data-view="iso">Perspective</button>
+          <button data-view="front">Front</button>
+          <button data-view="right">Right</button>
+          <button data-view="top">Top</button>
+        </nav>
 
         <div class="modal-transform" id="modal-transform" aria-live="polite">
           <strong id="modal-action">Move</strong><span id="modal-axis">Free</span><code id="modal-value">Mouse</code>
-          <small>Click / Enter to confirm · Esc to cancel</small>
+          <small>Enter to confirm · Esc to cancel</small>
         </div>
-        <div class="viewport-hint"><span>Orbit</span> drag <b>·</b> <span>Pan</span> right-drag <b>·</b> <span>Zoom</span> scroll</div>
+        <div class="viewport-hint">drag to orbit · right-drag to pan · scroll to zoom</div>
       </div>
 
       <aside class="inspector">
         <div class="panel-heading">
-          <div><p>OUTPUT</p><h1>Transform Matrix</h1></div>
-          <div class="status-badge"><span></span> Mat4</div>
+          <h1>Matrix</h1>
+          <button class="copy-button" id="copy-button">${icon('copy')}<span>Copy</span></button>
         </div>
-        <p class="panel-description">A live 4×4 model matrix composed from the object's position, rotation, and scale.</p>
 
         <div class="matrix-card">
           <div class="matrix-bracket left"></div>
           <div class="matrix-grid" id="matrix-grid"></div>
           <div class="matrix-bracket right"></div>
         </div>
-        <div class="matrix-meta"><span>Column-major · Float32</span><button id="copy-button">${icon('copy')}<span>Copy matrix</span></button></div>
 
-        <div class="separator"></div>
-
-        <section class="transform-section">
-          <div class="section-title"><div><span class="section-dot position-dot"></span><h2>Position</h2></div><small>units</small></div>
+        <section class="transform-section first">
+          <div class="section-title"><h2>Position</h2><small>units</small></div>
           <div class="input-grid" data-group="position">
             <label><span class="x">X</span><input type="number" data-axis="x" step="0.1"></label>
             <label><span class="y">Y</span><input type="number" data-axis="y" step="0.1"></label>
@@ -89,7 +63,7 @@ app.innerHTML = `
         </section>
 
         <section class="transform-section">
-          <div class="section-title"><div><span class="section-dot rotation-dot"></span><h2>Rotation</h2></div><small>degrees</small></div>
+          <div class="section-title"><h2>Rotation</h2><small>degrees</small></div>
           <div class="input-grid" data-group="rotation">
             <label><span class="x">X</span><input type="number" data-axis="x" step="1"></label>
             <label><span class="y">Y</span><input type="number" data-axis="y" step="1"></label>
@@ -98,7 +72,7 @@ app.innerHTML = `
         </section>
 
         <section class="transform-section">
-          <div class="section-title"><div><span class="section-dot scale-dot"></span><h2>Scale</h2></div><button class="link-scale active" id="link-scale" title="Link scale values"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button></div>
+          <div class="section-title"><h2>Scale</h2><button class="link-scale active" id="link-scale" title="Link scale values"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button></div>
           <div class="input-grid" data-group="scale">
             <label><span class="x">X</span><input type="number" data-axis="x" step="0.1" min="0.01"></label>
             <label><span class="y">Y</span><input type="number" data-axis="y" step="0.1" min="0.01"></label>
@@ -106,9 +80,7 @@ app.innerHTML = `
           </div>
         </section>
 
-        <button class="reset-wide" id="reset-wide">${icon('reset')} Reset transform</button>
-
-        <div class="shortcut-strip"><span><kbd>G</kbd> Move</span><span><kbd>R</kbd> Rotate</span><span><kbd>S</kbd> Scale</span></div>
+        <button class="reset-wide" id="reset-wide">${icon('reset')} Reset</button>
       </aside>
     </section>
   </main>
@@ -117,7 +89,7 @@ app.innerHTML = `
 const viewport = document.querySelector<HTMLDivElement>('#viewport')!
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0x151821)
-scene.fog = new THREE.FogExp2(0x151821, 0.027)
+
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
 camera.position.set(7.5, 5.8, 8.5)
@@ -173,10 +145,10 @@ grid.material.opacity = 0.52
 scene.add(grid)
 
 const subject = new THREE.Group()
-subject.position.set(0, 1.05, 0)
+subject.position.set(0, 0, 0)
 scene.add(subject)
 
-const geometry = new RoundedBoxGeometry(2.05, 2.05, 2.05, 6, 0.16)
+const geometry = new THREE.BoxGeometry(2, 2, 2)
 const material = new THREE.MeshStandardMaterial({
   color: 0xc5cad4,
   metalness: 0.18,
@@ -187,11 +159,6 @@ mesh.castShadow = true
 mesh.receiveShadow = true
 subject.add(mesh)
 
-const edges = new THREE.LineSegments(
-  new THREE.EdgesGeometry(geometry, 28),
-  new THREE.LineBasicMaterial({ color: 0xf4f6fb, transparent: true, opacity: 0.22 }),
-)
-subject.add(edges)
 
 const transform = new TransformControls(camera, renderer.domElement)
 transform.attach(subject)
@@ -302,7 +269,7 @@ const resetTransform = () => {
   subject.scale.set(1, 1, 1)
   updateUI()
 }
-document.querySelector('#reset-button')!.addEventListener('click', resetTransform)
+
 document.querySelector('#reset-wide')!.addEventListener('click', resetTransform)
 
 document.querySelector('#copy-button')!.addEventListener('click', async () => {
