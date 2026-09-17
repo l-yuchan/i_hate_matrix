@@ -76,6 +76,14 @@ kbd { font: 500 9px/1 DM Mono, monospace; color: #747c8d; background: #171920; b
 .axis-x { background: var(--red); color: var(--red); transform: rotate(0); padding-left: 31px; line-height: 1px; }
 .axis-y { background: var(--green); color: var(--green); transform: rotate(-90deg); padding-left: 31px; line-height: 1px; }
 .axis-z { position: absolute; left: 8px; bottom: 4px; color: var(--axis-blue); }
+.modal-transform { position: absolute; z-index: 6; left: 50%; bottom: 44px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #444a59; border-radius: 7px; color: #aeb5c2; background: #20232ded; box-shadow: 0 8px 25px #05060966; backdrop-filter: blur(10px); opacity: 0; pointer-events: none; transform: translate(-50%, 8px); transition: opacity .12s, transform .12s; }
+.modal-transform.visible { opacity: 1; transform: translate(-50%, 0); }
+.modal-transform strong { font-size: 10px; color: #eef1f7; }
+.modal-transform > span { min-width: 38px; padding-left: 8px; border-left: 1px solid #3b404c; font: 600 9px DM Mono; color: #88909f; }
+.modal-transform > span.axis-x { color: var(--red); }.modal-transform > span.axis-y { color: var(--green); }.modal-transform > span.axis-z { color: var(--axis-blue); }
+.modal-transform code { min-width: 50px; padding: 4px 6px; border-radius: 4px; color: #bfcdf5; background: #15171e; text-align: right; font: 500 9px DM Mono; }
+.modal-transform small { padding-left: 3px; color: #697180; font-size: 8px; white-space: nowrap; }
+.viewport.modal-active canvas { cursor: crosshair; }
 .viewport-hint { position: absolute; z-index: 3; bottom: 17px; left: 50%; transform: translateX(-50%); color: #5e6574; font-size: 9px; letter-spacing: .02em; white-space: nowrap; }
 .viewport-hint span { color: #8a92a1; }
 .viewport-hint b { padding: 0 5px; color: #3d424d; }
@@ -134,7 +142,7 @@ h2 { margin: 0; color: #cbd0da; font-size: 10px; font-weight: 550; }
   .inspector { border-left: 0; border-top: 1px solid #30333e; overflow: visible; }
 }
 @media (max-width: 520px) {
-  .file-pill, .tool span, .tool kbd, .viewport-hint { display: none; }
+  .file-pill, .tool span, .tool kbd, .viewport-hint, .modal-transform small { display: none; }
   .topbar { padding: 0 12px; }
   .workspace { grid-template-rows: 480px auto; }
   .inspector { padding: 22px 16px; }

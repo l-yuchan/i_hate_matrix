@@ -56,6 +56,10 @@ app.innerHTML = `
           <span class="axis-line axis-y">Y</span><span class="axis-line axis-x">X</span><span class="axis-z">Z</span>
         </div>
 
+        <div class="modal-transform" id="modal-transform" aria-live="polite">
+          <strong id="modal-action">Move</strong><span id="modal-axis">Free</span><code id="modal-value">Mouse</code>
+          <small>Click / Enter to confirm · Esc to cancel</small>
+        </div>
         <div class="viewport-hint"><span>Orbit</span> drag <b>·</b> <span>Pan</span> right-drag <b>·</b> <span>Zoom</span> scroll</div>
       </div>
 
@@ -129,7 +133,7 @@ viewport.prepend(renderer.domElement)
 const orbit = new OrbitControls(camera, renderer.domElement)
 orbit.target.set(0, 0.8, 0)
 orbit.enableDamping = true
-orbit.dampingFactor = 0.075
+orbit.dampingFactor = 0.18
 orbit.minDistance = 3
 orbit.maxDistance = 24
 orbit.maxPolarAngle = Math.PI * 0.49
@@ -336,14 +340,178 @@ document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((button) => 
   })
 })
 
+type ModalMode = 'translate' | 'rotate' | 'scale'
+type TransformAxis = 'x' | 'y' | 'z'
+type ModalTransform = {
+  mode: ModalMode
+  axis: TransformAxis | null
+  typedValue: string
+  startPointer: THREE.Vector2
+  startPosition: THREE.Vector3
+  startRotation: THREE.Euler
+  startScale: THREE.Vector3
+}
+
+const modalPanel = document.querySelector<HTMLDivElement>('#modal-transform')!
+const modalAction = document.querySelector<HTMLElement>('#modal-action')!
+const modalAxis = document.querySelector<HTMLElement>('#modal-axis')!
+const modalValue = document.querySelector<HTMLElement>('#modal-value')!
+const pointer = new THREE.Vector2(viewport.clientWidth / 2, viewport.clientHeight / 2)
+let modal: ModalTransform | null = null
+
+const modeNames: Record<ModalMode, string> = {
+  translate: 'Move',
+  rotate: 'Rotate',
+  scale: 'Scale',
+}
+
+function updateModalPanel(previewValue?: number) {
+  if (!modal) return
+  modalAction.textContent = modeNames[modal.mode]
+  modalAxis.textContent = modal.axis ? `${modal.axis.toUpperCase()} axis` : 'Free'
+  modalAxis.className = modal.axis ? `axis-${modal.axis}` : ''
+  if (modal.typedValue) {
+    const suffix = modal.mode === 'rotate' ? '°' : ''
+    modalValue.textContent = `${modal.typedValue}${suffix}`
+  } else if (previewValue !== undefined) {
+    const suffix = modal.mode === 'rotate' ? '°' : ''
+    modalValue.textContent = `${Number(previewValue.toFixed(3))}${suffix}`
+  } else {
+    modalValue.textContent = 'Mouse'
+  }
+}
+
+function startModalTransform(mode: ModalMode) {
+  if (modal) cancelModalTransform()
+  setMode(mode)
+  modal = {
+    mode,
+    axis: null,
+    typedValue: '',
+    startPointer: pointer.clone(),
+    startPosition: subject.position.clone(),
+    startRotation: subject.rotation.clone(),
+    startScale: subject.scale.clone(),
+  }
+  orbit.enabled = false
+  transform.enabled = false
+  transformHelper.visible = false
+  modalPanel.classList.add('visible')
+  viewport.classList.add('modal-active')
+  updateModalPanel()
+}
+
+function finishModalTransform() {
+  if (!modal) return
+  modal = null
+  orbit.enabled = true
+  transform.enabled = true
+  transformHelper.visible = true
+  modalPanel.classList.remove('visible')
+  viewport.classList.remove('modal-active')
+  updateUI()
+}
+
+function cancelModalTransform() {
+  if (!modal) return
+  subject.position.copy(modal.startPosition)
+  subject.rotation.copy(modal.startRotation)
+  subject.scale.copy(modal.startScale)
+  finishModalTransform()
+}
+
+function applyModalTransform(clientX: number, clientY: number) {
+  if (!modal) return
+  subject.position.copy(modal.startPosition)
+  subject.rotation.copy(modal.startRotation)
+  subject.scale.copy(modal.startScale)
+
+  const parsedValue = Number(modal.typedValue)
+  const hasTypedValue = modal.typedValue !== '' && Number.isFinite(parsedValue)
+  const dx = clientX - modal.startPointer.x
+  const dy = clientY - modal.startPointer.y
+  const mouseDelta = (dx - dy) * (modal.mode === 'rotate' ? 0.45 : 0.012)
+  let previewValue = hasTypedValue ? parsedValue : mouseDelta
+
+  if (modal.mode === 'translate') {
+    if (modal.axis) {
+      subject.position[modal.axis] = modal.startPosition[modal.axis] + previewValue
+    } else if (!hasTypedValue) {
+      const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0)
+      const cameraUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1)
+      subject.position.addScaledVector(cameraRight, dx * 0.012)
+      subject.position.addScaledVector(cameraUp, -dy * 0.012)
+      previewValue = Math.hypot(dx, dy) * 0.012
+    }
+  }
+
+  if (modal.mode === 'rotate') {
+    const axis = modal.axis ?? 'z'
+    const angle = THREE.MathUtils.degToRad(previewValue)
+    subject.rotation[axis] = modal.startRotation[axis] + angle
+  }
+
+  if (modal.mode === 'scale') {
+    const factor = Math.max(0.01, hasTypedValue ? parsedValue : Math.exp((dx - dy) * 0.006))
+    previewValue = factor
+    if (modal.axis) {
+      subject.scale[modal.axis] = modal.startScale[modal.axis] * factor
+    } else {
+      subject.scale.copy(modal.startScale).multiplyScalar(factor)
+    }
+  }
+
+  updateModalPanel(previewValue)
+  updateUI()
+}
+
+viewport.addEventListener('pointermove', (event) => {
+  pointer.set(event.clientX, event.clientY)
+  if (modal && !modal.typedValue) applyModalTransform(event.clientX, event.clientY)
+})
+
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (!modal) return
+  event.preventDefault()
+  if (event.button === 2) cancelModalTransform()
+  else if (event.button === 0) finishModalTransform()
+})
+
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLInputElement) return
   const keyName = event.key.toLowerCase()
-  if (keyName === 'g') setMode('translate')
-  if (keyName === 'r') setMode('rotate')
-  if (keyName === 's') setMode('scale')
-  if (keyName === 'escape') resetTransform()
+
+  if (!modal) {
+    if (keyName === 'g') startModalTransform('translate')
+    else if (keyName === 'r') startModalTransform('rotate')
+    else if (keyName === 's') startModalTransform('scale')
+    else if (keyName === 'escape') resetTransform()
+    else return
+    event.preventDefault()
+    return
+  }
+
+  if (keyName === 'escape') {
+    cancelModalTransform()
+  } else if (keyName === 'enter') {
+    finishModalTransform()
+  } else if (keyName === 'x' || keyName === 'y' || keyName === 'z') {
+    modal.axis = keyName
+    applyModalTransform(pointer.x, pointer.y)
+  } else if (/^[0-9]$/.test(keyName) || keyName === '.' || keyName === '-') {
+    if (keyName === '-' && modal.typedValue.includes('-')) return
+    if (keyName === '.' && modal.typedValue.includes('.')) return
+    modal.typedValue += keyName
+    applyModalTransform(pointer.x, pointer.y)
+  } else if (keyName === 'backspace') {
+    modal.typedValue = modal.typedValue.slice(0, -1)
+    applyModalTransform(pointer.x, pointer.y)
+  } else {
+    return
+  }
+  event.preventDefault()
 })
+
 viewport.addEventListener('contextmenu', (event) => event.preventDefault())
 
 const resize = () => {
